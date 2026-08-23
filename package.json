@@ -1,0 +1,13 @@
+{
+  "name": "practical-7-auth-middleware-pipeline",
+  "version": "1.0.0",
+  "description": "Practical 7: JWT-based Authentication and Middleware Pipeline with Express, MongoDB, and React",
+  "scripts": {
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "install:all": "cd backend && npm install && cd ../frontend && npm install"
+  },
+  "keywords": ["jwt", "authentication", "middleware", "bcrypt", "mern", "express", "mongodb", "practical7"],
+  "author": "24IT037",
+  "license": "ISC"
+}

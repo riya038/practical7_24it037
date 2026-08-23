@@ -1,0 +1,146 @@
+require('dotenv').config();
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+
+const authRoutes = require('./routes/authRoutes');
+const taskRoutes = require('./routes/taskRoutes');
+
+const app = express();
+
+// ==========================================
+// 1. CORS & MIDDLEWARE
+// ==========================================
+app.use(
+  cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
+
+app.use(express.json());
+
+// Request logger middleware
+app.use((req, res, next) => {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] ${req.method} ${req.originalUrl}`);
+  next();
+});
+
+// ==========================================
+// 2. MONGODB CONNECTION
+// ==========================================
+const MONGO_URI =
+  process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/taskdb_practical7';
+
+mongoose
+  .connect(MONGO_URI)
+  .then(() => {
+    console.log('✅ MongoDB connected successfully to:', MONGO_URI);
+  })
+  .catch((err) => {
+    console.error('❌ MongoDB connection error:', err.message);
+    process.exit(1);
+  });
+
+// ==========================================
+// 3. API ROUTES
+// ==========================================
+
+// Welcome / API Documentation Endpoint
+app.get('/', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'Practical 7: JWT Authentication & Middleware Pipeline API is running.',
+    version: '1.0.0',
+    endpoints: {
+      auth: {
+        register: 'POST /auth/register',
+        login: 'POST /auth/login',
+        me: 'GET /auth/me (Protected: Requires Bearer Token)',
+      },
+      tasks: {
+        getAll: 'GET /tasks (Protected: Requires Bearer Token)',
+        getById: 'GET /tasks/:id (Protected: Requires Bearer Token)',
+        create: 'POST /tasks (Protected: Requires Bearer Token)',
+        update: 'PUT /tasks/:id (Protected: Requires Bearer Token)',
+        delete: 'DELETE /tasks/:id (Protected: Requires Bearer Token)',
+      },
+    },
+  });
+});
+
+// Mount Routes (supporting both /auth and /api/auth, /tasks and /api/tasks)
+app.use('/auth', authRoutes);
+app.use('/api/auth', authRoutes);
+
+app.use('/tasks', taskRoutes);
+app.use('/api/tasks', taskRoutes);
+
+// 404 Route Handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: 'NotFound',
+    message: `Endpoint ${req.method} ${req.originalUrl} does not exist on this server.`,
+  });
+});
+
+// ==========================================
+// 4. GLOBAL ERROR HANDLER MIDDLEWARE
+// ==========================================
+app.use((err, req, res, next) => {
+  console.error('⚠️ Global Error Handler:', err);
+
+  // Mongoose Validation Error
+  if (err.name === 'ValidationError') {
+    const details = {};
+    Object.keys(err.errors).forEach((key) => {
+      details[key] = err.errors[key].message;
+    });
+
+    return res.status(400).json({
+      success: false,
+      error: 'ValidationError',
+      message: 'Database schema validation failed.',
+      details,
+    });
+  }
+
+  // Mongoose Cast Error (Invalid ObjectID)
+  if (err.name === 'CastError') {
+    return res.status(404).json({
+      success: false,
+      error: 'NotFound',
+      message: `Invalid ID format: ${err.value}`,
+    });
+  }
+
+  // Duplicate Key Error (e.g., unique email violation)
+  if (err.code === 11000) {
+    return res.status(400).json({
+      success: false,
+      error: 'Conflict',
+      message: 'A record with this field already exists.',
+      details: err.keyValue,
+    });
+  }
+
+  // Generic Internal Server Error
+  res.status(err.status || 500).json({
+    success: false,
+    error: 'ServerError',
+    message: err.message || 'An unexpected internal server error occurred.',
+  });
+});
+
+// ==========================================
+// 5. START SERVER
+// ==========================================
+const PORT = process.env.PORT || 5000;
+
+app.listen(PORT, () => {
+  console.log(`🚀 Practical 7 Express API running on http://localhost:${PORT}`);
+  console.log(`🔐 JWT Secret active with 1-hour token expiration.`);
+});
