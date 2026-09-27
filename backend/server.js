@@ -48,11 +48,13 @@ mongoose
 // 3. API ROUTES
 // ==========================================
 
+const cache = require('./utils/cache');
+
 // Welcome / API Documentation Endpoint
 app.get('/', (req, res) => {
   res.status(200).json({
     success: true,
-    message: 'Practical 7: JWT Authentication & Middleware Pipeline API is running.',
+    message: 'Practical 9: In-Memory Caching and Query Optimization API is running.',
     version: '1.0.0',
     endpoints: {
       auth: {
@@ -61,13 +63,34 @@ app.get('/', (req, res) => {
         me: 'GET /auth/me (Protected: Requires Bearer Token)',
       },
       tasks: {
-        getAll: 'GET /tasks (Protected: Requires Bearer Token)',
-        getById: 'GET /tasks/:id (Protected: Requires Bearer Token)',
-        create: 'POST /tasks (Protected: Requires Bearer Token)',
-        update: 'PUT /tasks/:id (Protected: Requires Bearer Token)',
-        delete: 'DELETE /tasks/:id (Protected: Requires Bearer Token)',
+        getAll: 'GET /tasks (Cached with node-cache, 60s TTL)',
+        getById: 'GET /tasks/:id (Cached separately, 60s TTL)',
+        create: 'POST /tasks (Invalidates cache)',
+        update: 'PUT /tasks/:id (Invalidates cache)',
+        delete: 'DELETE /tasks/:id (Invalidates cache)',
+      },
+      cache: {
+        stats: 'GET /cache/stats (Cache hit/miss metrics)',
+        clear: 'POST /cache/clear (Flush cache and reset counters)',
       },
     },
+  });
+});
+
+// Cache Debug Stats Endpoints
+app.get('/cache/stats', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'Cache performance metrics & statistics',
+    data: cache.getDebugStats(),
+  });
+});
+
+app.post('/cache/clear', (req, res) => {
+  cache.resetStats();
+  res.status(200).json({
+    success: true,
+    message: 'In-memory cache flushed and counters reset.',
   });
 });
 
@@ -141,6 +164,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`🚀 Practical 7 Express API running on http://localhost:${PORT}`);
+  console.log(`🚀 Practical 9 Express API running on http://localhost:${PORT}`);
+  console.log(`⚡ In-Memory Cache active with node-cache (stdTTL: 60s).`);
   console.log(`🔐 JWT Secret active with 1-hour token expiration.`);
 });
