@@ -24,55 +24,7 @@
 
 6\. Measure and document empirical API response time differences (uncached vs cached) using Thunder Client with 3 sample readings per condition.
 
-**---**
 
-**## 🏗️ Architecture & In-Memory Caching Workflow**
-
-\`\`\`text
-
-                                  CLIENT REQUEST
-
-                                        │
-
-                 ┌──────────────────────┴──────────────────────┐
-
-                 ▼                                             ▼
-
-          [GET /tasks (Read)]                      [POST/PUT/DELETE /tasks (Write)]
-
-                 │                                             │
-
-                 ▼                                             ▼
-
-         Cache Check (node-cache)                         Write to MongoDB
-
-                 │                                             │
-
-        ┌────────┴────────┐                                    ▼
-
-        ▼                 ▼                           Invalidate Cache Key
-
-  [Cache HIT]       [Cache MISS]                  (cache.del('all_tasks', 'task\_:id'))
-
-        │                 │                                    │
-
-  Return cached     Query MongoDB                              ▼
-
-   immediately            │                          Return write response
-
-   (sub-5ms)       Store in Cache
-
-                    (stdTTL: 60s)
-
-                          │
-
-                          ▼
-
-                     Return Data
-
-\`\`\`
-
-**---**
 
 **## 🛠️ Step-by-Step Implementation Summary**
 
@@ -334,14 +286,6 @@ The first \`GET /tasks\` request returned **X-Cache: MISS** with an observed res
 
   \`\`\`
 
-**### 3. Invalidation Test on Write (\`POST /tasks\` or \`PUT /tasks/\:id\`)**
-
-\* When a \`POST\`, \`PUT\`, or \`DELETE\` request is sent, the server executes \`cache.del('all_tasks')\`.
-
-\* The immediate next \`GET /tasks\` request yields \`X-Cache: MISS\`, queries MongoDB to get fresh data, and updates the cache.
-
-**---**
-
 **## ❓ Key Analysis & Viva Questions with Detailed Answers**
 
 **### Q1: Why must the cache be invalidated on every write operation, and what would happen to data correctness if it were not?**
@@ -400,36 +344,8 @@ The first \`GET /tasks\` request returned **X-Cache: MISS** with an observed res
 
    - Instance B remains unaware of the update and continues serving stale data from its own local RAM to clients routed to it by the load balancer.
 
-3\. **\*\*Horizontal Scaling Solution:\*\*** For multi-instance deployments, a **\*\*centralized / distributed caching layer\*\*** such as **\*\*Redis\*\*** or **\*\*Memcached\*\*** is used so that all server instances share a single source of truth for cached data.
 
-**---**
 
-**## 🔧 Troubleshooting Guide**
 
-\| Symptom | Likely Cause | Fix |
 
-\|---|---|---|
 
-\| **\*\*Updated task not reflected in GET response\*\*** | Cache not invalidated after \`PUT\`/\`DELETE\` | Call \`cache.del('all_tasks')\` and \`cache.del('task\_:id')\` inside every write handler. |
-
-\| **\*\*No measurable difference between cached and uncached\*\*** | TTL too short or cache key changing per request | Use a fixed, consistent cache key string (\`all_tasks\`) and a TTL of at least 60 seconds. |
-
-\| **\*\*Cache works but server restarts wipe it\*\*** | \`node-cache\` is process-local and resets on restart | Expected behavior for in-memory caching; persistent caching requires Redis. |
-
-\| **\*\*Response time barely changes\*\*** | MongoDB dataset is tiny and indexed in local RAM | Add more sample task documents to database to make query vs cache latency prominent. |
-
-**---**
-
-**## 📦 GitHub Deliverables Checklist**
-
-\- [x] Node-cache implementation integrated with Express and Mongoose (\`backend/utils/cache.js\`).
-
-\- [x] Standard 60s TTL on \`GET /tasks\` with cache check before database query.
-
-\- [x] Single-task endpoint \`GET /tasks/\:id\` cached independently.
-
-\- [x] Cache invalidation on all write operations (\`POST\`, \`PUT\`, \`DELETE\`).
-
-\- [x] Cache hit / miss counters exposed on debug endpoint (\`GET /cache/stats\`).
-
-\- [x] Response time comparison table (uncached vs cached) documented with 3 sample readings.
